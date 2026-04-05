@@ -1,91 +1,193 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { analyzeStudent } from '../api';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { analyzeStudent } from "../api";
+
+const studentOptions = [
+  "STU_001","STU_002","STU_003","STU_004","STU_005",
+  "STU_006","STU_007","STU_008","STU_009","STU_010"
+];
+
+const statusColor = {
+  improving: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  declining: "bg-red-50 text-red-700 ring-red-200",
+  stable: "bg-amber-50 text-amber-700 ring-amber-200",
+};
 
 export default function Analyze() {
-  const { id } = useParams();
+  const { studentId: routeStudentId } = useParams();
   const navigate = useNavigate();
+  const [studentId, setStudentId] = useState(routeStudentId || "STU_001");
   const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    analyzeStudent(id)
-      .then(r => setData(r.data))
-      .catch(() => setError('Could not fetch analysis. Check if backend is running.'))
-      .finally(() => setLoading(false));
-  }, [id]);
+    if (routeStudentId) setStudentId(routeStudentId.toUpperCase());
+  }, [routeStudentId]);
 
-  if (loading) return <Centered>Analyzing student {id}...</Centered>;
-  if (error) return <Centered className="text-red-400">{error}</Centered>;
+  useEffect(() => {
+    analyzeStudent(studentId)
+      .then((res) => {
+        setData(res);
+        setError("");
+      })
+      .catch(() => setError("Could not fetch analysis."));
+  }, [studentId]);
 
-  const { student, summary, chapter_breakdown, strengths, weaknesses } = data;
+  const handleStudentChange = (e) => {
+    const newId = e.target.value;
+    setStudentId(newId);
+    navigate(`/analyze/${newId}`);
+  };
+
+  if (error) {
+    return <div className="min-h-screen bg-slate-50 p-6 text-red-600">{error}</div>;
+  }
+
+  if (!data) {
+    return <div className="min-h-screen bg-slate-50 p-6 text-slate-600">Loading analysis...</div>;
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 flex flex-col gap-8">
-      <button onClick={() => navigate('/')} className="text-slate-400 hover:text-white text-sm w-fit">← Back</button>
-
-      <div className="bg-slate-800 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-blue-400">{student?.name ?? `Student ${id}`}</h2>
-        <p className="text-slate-400 text-sm mt-1">ID: {id}</p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Sessions', value: summary?.total_sessions },
-          { label: 'Avg Accuracy', value: summary?.avg_accuracy != null ? `${summary.avg_accuracy.toFixed(1)}%` : '—' },
-          { label: 'Avg Speed (s/q)', value: summary?.avg_speed != null ? summary.avg_speed.toFixed(1) : '—' },
-          { label: 'Completion', value: summary?.completion_rate != null ? `${summary.completion_rate.toFixed(1)}%` : '—' },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-slate-800 rounded-xl p-4 text-center">
-            <p className="text-slate-400 text-xs mb-1">{label}</p>
-            <p className="text-white text-xl font-bold">{value ?? '—'}</p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div>
+            <p className="text-sm font-medium text-indigo-600">Analysis Dashboard</p>
+            <h1 className="text-2xl font-bold text-slate-900">{data.name}</h1>
           </div>
-        ))}
+          <div className="flex gap-2">
+            <Link to="/" className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Home
+            </Link>
+            <Link to={`/recommend/${studentId}`} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              Study Plan
+            </Link>
+          </div>
+        </div>
       </div>
 
-      <Section title="Strengths">
-        {strengths?.length ? strengths.map(s => <Tag key={s} text={s} color="emerald" />) : <p className="text-slate-400">None found</p>}
-      </Section>
+      <div className="mx-auto max-w-7xl space-y-6 p-6">
+        <div className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <label className="mb-2 block text-sm font-semibold text-slate-700">Select Student</label>
+          <select
+            value={studentId}
+            onChange={handleStudentChange}
+            className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          >
+            {studentOptions.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </div>
 
-      <Section title="Weaknesses">
-        {weaknesses?.length ? weaknesses.map(w => <Tag key={w} text={w} color="red" />) : <p className="text-slate-400">None found</p>}
-      </Section>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-500 p-6 text-white shadow-lg">
+            <p className="text-sm text-indigo-100">Average Score</p>
+            <p className="mt-2 text-4xl font-bold">{data.avg_score_pct}%</p>
+          </div>
 
-      <Section title="Chapter Breakdown">
-        <div className="flex flex-col gap-3">
-          {chapter_breakdown?.map(ch => (
-            <div key={ch.chapter} className="bg-slate-700 rounded-xl p-4 flex justify-between items-center">
-              <div>
-                <p className="font-semibold text-white">{ch.chapter}</p>
-                <p className="text-slate-400 text-sm">{ch.subject} · {ch.attempts} attempts</p>
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm text-slate-500">Completion Rate</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">{data.completion_rate_pct}%</p>
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm text-slate-500">Attempt Rate</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">{data.avg_attempt_rate_pct}%</p>
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm text-slate-500">Speed</p>
+            <p className="mt-2 text-3xl font-bold capitalize text-slate-900">{data.speed_status}</p>
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm text-slate-500">Trend</p>
+            <span className={`mt-3 inline-flex rounded-full px-3 py-2 text-sm font-semibold ring-1 ${statusColor[data.score_trend] || "bg-slate-50 text-slate-700 ring-slate-200"}`}>
+              {data.score_trend}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 lg:col-span-2">
+            <h2 className="text-2xl font-bold text-slate-900">Overview</h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Student ID</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{data.student_id}</p>
               </div>
-              <div className="text-right">
-                <p className="text-blue-400 font-bold">{ch.avg_accuracy != null ? `${ch.avg_accuracy.toFixed(1)}%` : '—'}</p>
-                <p className="text-slate-400 text-xs">accuracy</p>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Stream</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{data.stream}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Recent Avg Score</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{data.recent_avg_score_pct}%</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Integer Avoidance</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {data.integer_question_avoidance ? "Yes" : "No"}
+                </p>
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900">Quick Actions</h2>
+            <div className="mt-5 space-y-3">
+              <Link
+                to={`/recommend/${studentId}`}
+                className="block rounded-2xl bg-indigo-600 px-4 py-4 text-center font-semibold text-white hover:bg-indigo-700"
+              >
+                View Study Plan
+              </Link>
+              <Link
+                to="/leaderboard"
+                className="block rounded-2xl border border-slate-300 px-4 py-4 text-center font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Open Leaderboard
+              </Link>
+            </div>
+          </div>
         </div>
-      </Section>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900">Weaknesses</h2>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {data.weaknesses?.length ? data.weaknesses.map((item) => (
+                <span key={item} className="rounded-full bg-red-50 px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-red-200">
+                  {item}
+                </span>
+              )) : <p className="text-slate-500">No major weaknesses identified.</p>}
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900">Strengths</h2>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {data.strengths?.length ? data.strengths.map((item) => (
+                <span key={item} className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+                  {item}
+                </span>
+              )) : <p className="text-slate-500">No major strengths identified yet.</p>}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <h2 className="text-2xl font-bold text-slate-900">Behavior Patterns</h2>
+          <div className="mt-5 grid gap-3">
+            {data.patterns?.map((pattern, index) => (
+              <div key={index} className="rounded-2xl bg-slate-50 p-4 text-slate-700 ring-1 ring-slate-200">
+                {pattern}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
-
-function Centered({ children, className = 'text-slate-300' }) {
-  return <div className={`min-h-screen flex items-center justify-center text-xl ${className}`}>{children}</div>;
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="bg-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-      <h3 className="text-lg font-semibold text-slate-200">{title}</h3>
-      <div className="flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
-}
-
-function Tag({ text, color }) {
-  const colors = { emerald: 'bg-emerald-900 text-emerald-300', red: 'bg-red-900 text-red-300' };
-  return <span className={`px-3 py-1 rounded-full text-sm font-medium ${colors[color]}`}>{text}</span>;
 }

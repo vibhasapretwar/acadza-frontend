@@ -1,65 +1,200 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { recommendStudent } from '../api';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { recommendStudent } from "../api";
 
-const STEP_COLORS = ['blue', 'emerald', 'violet', 'amber', 'rose'];
-const BG = { blue: 'bg-blue-900', emerald: 'bg-emerald-900', violet: 'bg-violet-900', amber: 'bg-amber-900', rose: 'bg-rose-900' };
-const TEXT = { blue: 'text-blue-300', emerald: 'text-emerald-300', violet: 'text-violet-300', amber: 'text-amber-300', rose: 'text-rose-300' };
+const studentOptions = [
+  "STU_001",
+  "STU_002",
+  "STU_003",
+  "STU_004",
+  "STU_005",
+  "STU_006",
+  "STU_007",
+  "STU_008",
+  "STU_009",
+  "STU_010",
+];
 
 export default function Recommend() {
-  const { id } = useParams();
+  const { studentId: routeStudentId } = useParams();
   const navigate = useNavigate();
+  const [studentId, setStudentId] = useState(routeStudentId || "STU_001");
   const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    recommendStudent(id)
-      .then(r => setData(r.data))
-      .catch(() => setError('Could not fetch recommendations.'))
-      .finally(() => setLoading(false));
-  }, [id]);
+    if (routeStudentId) {
+      setStudentId(routeStudentId.toUpperCase());
+    }
+  }, [routeStudentId]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-300 text-xl">Building study plan for student {id}...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-400 text-xl">{error}</div>;
+  useEffect(() => {
+    recommendStudent(studentId)
+      .then((res) => {
+        setData(res);
+        setError("");
+      })
+      .catch(() => setError("Could not fetch recommendations."));
+  }, [studentId]);
 
-  const { student, study_plan } = data;
+  const handleStudentChange = (e) => {
+    const newId = e.target.value;
+    setStudentId(newId);
+    navigate(`/recommend/${newId}`);
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6 text-red-600 font-medium">
+        {error}
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6 text-slate-600">
+        Loading study plan...
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-6">
-      <button onClick={() => navigate('/')} className="text-slate-400 hover:text-white text-sm w-fit">← Back</button>
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Select Student
+          </label>
+          <select
+            value={studentId}
+            onChange={handleStudentChange}
+            className="w-full rounded-2xl border border-slate-300 p-4 text-lg outline-none focus:border-indigo-500"
+          >
+            {studentOptions.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <div className="bg-slate-800 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-emerald-400">DOST Study Plan</h2>
-        <p className="text-slate-400 mt-1">{student?.name ?? `Student ${id}`}</p>
-      </div>
-
-      {study_plan?.map((step, i) => {
-        const color = STEP_COLORS[i % STEP_COLORS.length];
-        return (
-          <div key={i} className={`${BG[color]} bg-opacity-30 border border-slate-700 rounded-2xl p-6 flex flex-col gap-3`}>
-            <div className="flex items-center gap-3">
-              <span className={`${BG[color]} ${TEXT[color]} text-xs font-bold px-3 py-1 rounded-full`}>Step {i + 1}</span>
-              <span className={`${TEXT[color]} font-semibold text-sm`}>{step.dost_type}</span>
+        <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900">{data.name}</h1>
+              <p className="mt-3 text-lg text-slate-600">Student ID: {data.student_id}</p>
+              <p className="text-slate-600">Generated At: {data.generated_at}</p>
             </div>
-            <p className="text-white font-medium text-lg">{step.chapter ?? step.subject ?? 'General'}</p>
-            <p className="text-slate-300 text-sm">{step.reason}</p>
-            {step.question_ids?.length > 0 && (
-              <div>
-                <p className="text-slate-400 text-xs mb-2">Questions to attempt:</p>
-                <div className="flex flex-wrap gap-2">
-                  {step.question_ids.slice(0, 10).map(qid => (
-                    <span key={qid} className="bg-slate-700 text-slate-200 text-xs px-2 py-1 rounded font-mono">{qid}</span>
-                  ))}
-                  {step.question_ids.length > 10 && (
-                    <span className="text-slate-400 text-xs self-center">+{step.question_ids.length - 10} more</span>
-                  )}
+
+            <div className="rounded-2xl bg-indigo-50 px-5 py-4 text-indigo-700">
+              <p className="text-sm font-medium">Total Steps</p>
+              <p className="text-3xl font-bold">{data.total_steps}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Average Score</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">
+                {data.summary?.avg_score_pct}%
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Trend</p>
+              <p className="mt-1 text-xl font-semibold capitalize text-slate-900">
+                {data.summary?.score_trend}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Primary Weakness</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">
+                {data.summary?.primary_weakness}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Focus Subject</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">
+                {data.summary?.focus_subject}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {data.steps?.map((step) => (
+            <div
+              key={step.step}
+              className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200"
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="inline-flex rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700">
+                    Step {step.step}
+                  </div>
+                  <h2 className="mt-3 text-2xl font-bold text-slate-900">
+                    {step.dost_type}
+                  </h2>
+                  <p className="mt-2 text-slate-600">
+                    {step.target_subject} • {step.target_chapter}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
+                  Questions: {step.question_ids?.length || 0}
                 </div>
               </div>
-            )}
-          </div>
-        );
-      })}
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm font-medium text-slate-500">Reasoning</p>
+                  <p className="mt-2 text-slate-700 leading-7">{step.reasoning}</p>
+                </div>
+
+                <div className="rounded-2xl bg-indigo-50 p-4">
+                  <p className="text-sm font-medium text-indigo-500">Action Message</p>
+                  <p className="mt-2 text-indigo-700 leading-7">{step.message}</p>
+                </div>
+              </div>
+
+              {step.params && Object.keys(step.params).length > 0 && (
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-medium text-slate-500">Parameters</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(step.params).map(([key, value]) => (
+                      <span
+                        key={key}
+                        className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                      >
+                        {key}: {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {step.question_ids?.length > 0 && (
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-medium text-slate-500">Question IDs</p>
+                  <div className="flex flex-wrap gap-2">
+                    {step.question_ids.map((qid) => (
+                      <span
+                        key={qid}
+                        className="rounded-full bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+                      >
+                        {qid}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
